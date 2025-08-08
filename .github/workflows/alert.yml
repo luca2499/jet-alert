@@ -1,0 +1,38 @@
+name: Jet Alert
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"     # alle 5 Minuten
+  workflow_dispatch:           # manuell startbar
+
+permissions:
+  contents: write              # erlaubt Commit von state.json
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Run tracker
+        env:
+          ICAO_HEX: ${{ vars.ICAO_HEX }}
+          ADSB_URL: ${{ vars.ADSB_URL }}
+          TG_TOKEN:  ${{ secrets.TG_TOKEN }}
+          TG_CHAT_ID: ${{ vars.TG_CHAT_ID }}
+          MIN_GS: "40"
+        run: python tracker.py
+      - name: Commit state if changed
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git config user.email "actions@github.com"
+            git config user.name "github-actions"
+            git add state.json
+            git commit -m "Update state [skip ci]"
+            git push
+          else
+            echo "No changes."
+          fi
